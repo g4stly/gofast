@@ -19,7 +19,7 @@ type command struct {
 	directoryTree	branch
 	templates	map[string]*template.Template
 	targetName	string
-	targetType	string
+	targetProjectType	string
 }
 
 // this type shouldn't even exist
@@ -92,7 +92,7 @@ func (self *command) Exec(args []string) int {
 		return self.Help()
 		break
 	case 1:
-		self.targetType = "generic"
+		self.targetProjectType = "generic"
 		self.targetName = args[0]
 		return self.createNewProject()
 		break
@@ -102,46 +102,32 @@ func (self *command) Exec(args []string) int {
 }
 
 func (self *command) createNewProject() int {
-	common.Log("creating new %v project with name %v", self.targetType, self.targetName)
+	common.Log("creating new %v project with name %v", self.targetProjectType, self.targetName)
 
 	// parse the template package
-	zipReader := getZipReader(self.targetType)
+	zipReader := getZipReader(self.targetProjectType)
 	defer zipReader.Close()
 
 	self.directoryTree = branch{name: "NO_LAYOUT"}
-	common.Log("reading into zip `%v.zip`", self.targetType)
 	for _, zippedFile := range zipReader.File {
-		// open file no matter what
-		filename	:= zippedFile.Name
-		size		:= int64(zippedFile.UncompressedSize64)
-
-		file, err := zippedFile.Open()
-		if err != nil {
-			common.Fatal("create: zippedFile.Open(): %v", err)
-		}
-		defer file.Close()
+		// read fileContents from the zipped file
+		fileContents := readZippedFile(zippedFile)
 
 		// if it's the layout.json, parse that 
-		if filename == "layout.json" {
+		if zippedFile.Name == "layout.json" {
 			common.Log("parsing layout.json")
-			self.directoryTree = jsonToBranch(self.targetName, readJson(file, size))
+			self.directoryTree = jsonToBranch(readJson(fileContents))
 			continue
 		}
 
 		// otherwise, create a new template
-		common.Log("creating template with name `%v`", filename)
+		common.Log("creating template with name `%v`", zippedFile.Name)
 
-		buffer := &stringBuf{}
-		bytes, err := io.CopyN(buffer, file, size)
-		common.Log("read %v bytes from %v", bytes, filename)
-
-		if err != nil {
-			common.Fatal("create: file.Read(): %v", err)
-		}
-
-		tempTemplate := template.New(filename)
-		self.templates[filename] = template.Must(tempTemplate.Parse(buffer.asString))
+		tempTemplate := template.New(zippedFile.Name)
+		self.templates[zippedFile.Name] = template.Must(tempTemplate.Parse(fileContests.asString))
 	}
+
+	// if we didn't find a layout.json, banic!
 	if self.directoryTree.name == "NO_LAYOUT" {
 		common.Fatal("create: failed to find `layout.json`")
 	}
@@ -160,22 +146,31 @@ func getZipReader(templateName string) *zip.ReadCloser {
 	return reader
 }
 
-func readJson(file io.ReadCloser, size int64) map[string]interface{} {
+func readZippedFile(zippedFile *zip.ReadCloser) *stringBuf {
+	file, err := zippedFile.Open()
+	if err != nil {
+		common.Fatal("create: readZippedFile(): %v", err)
+	}
+	defer file.Close()
 
-	jsonData := &stringBuf{}
-	bytes, err := io.CopyN(jsonData, file, size)
+	buffer := &stringBuf{}
+	size := int64(zippedFile.UncompressedSize64)
+
+	bytes, err := io.CopyN(buffer, file, size)
 	common.Log("read %v bytes from layout.json", bytes)
 	if err != nil {
 		common.Fatal("create: file.Read(): %v", err)
 	}
 
-	common.Log("json as string:\n%v\n", jsonData.asString)
+	return buffer
+}
+
+func readJson(jsonData []byte, size int64) map[string]interface{} {
 	var jsonObject interface{}
-	err = json.Unmarshal(jsonData.asBytes, &jsonObject)
+	err = json.Unmarshal(jsonData, &jsonObject)
 	if err != nil {
 		common.Fatal("create: json.Unmarshal(): %v", err)
 	}
-
 	return jsonObject.(map[string]interface{})
 }
 
