@@ -79,6 +79,7 @@ func (self *branch) create(dirname string, templates map[string]*template.Templa
 			common.Fatal("create: template.Execute(): %v", err)
 		}
 	}
+	// recursion is fucking sexy btw
 	for _, dir := range self.directories {
 		dir.create(dirname, templates)
 	}
