@@ -1,10 +1,10 @@
 package common
 
 import (
-	"os"
-	"io"
-	"fmt"
 	"flag"
+	"fmt"
+	"io"
+	"os"
 )
 
 func init() {
@@ -13,16 +13,18 @@ func init() {
 }
 
 type Command interface {
-	Help()		int;
-	Exec([]string)	int;
+	Help() int
+	Exec([]string) int
 }
 
 var Args []string
-var verbose	= flag.Bool("v", false, "verbose: print debug output")
-var silent	= flag.Bool("s", false, "silent: surpress all output")
+var verbose = flag.Bool("v", false, "verbose: print debug output")
+var silent = flag.Bool("s", false, "silent: surpress all output")
 
 func msg(w io.Writer, badge string, fmtstring string, args ...interface{}) {
-	if *silent { return }
+	if *silent {
+		return
+	}
 	if len(args) < 1 {
 		w.Write([]byte(fmt.Sprintf("%v: %v\n", badge, fmtstring)))
 	} else {
@@ -31,7 +33,9 @@ func msg(w io.Writer, badge string, fmtstring string, args ...interface{}) {
 }
 
 func Log(fmtstring string, args ...interface{}) {
-	if !*verbose { return }
+	if !*verbose {
+		return
+	}
 	msg(os.Stdout, "DEBUG", fmtstring, args...)
 }
 

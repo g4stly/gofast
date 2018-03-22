@@ -1,32 +1,32 @@
 package create
 
 import (
-	"fmt"
-	"os"
-	"encoding/json"
 	"archive/zip"
-	"text/template"
-	"io"
+	"encoding/json"
+	"fmt"
 	"github.com/g4stly/gofast/common"
+	"io"
+	"os"
+	"text/template"
 )
 
-/* creating the command type makes it easy to 
+/* creating the command type makes it easy to
  * pass around the methods we actually want
  * to make available to other parts of our program,
  * the command type is simply the thing we're passing */
 
 type command struct {
-	directoryTree	branch
-	templates	map[string]*template.Template
-	targetName	string
-	targetProjectType	string
+	directoryTree     branch
+	templates         map[string]*template.Template
+	targetName        string
+	targetProjectType string
 }
 
 // this type shouldn't even exist
 
 type stringBuf struct {
-	asString	string
-	asBytes		[]byte
+	asString string
+	asBytes  []byte
 }
 
 func (self *stringBuf) Write(p []byte) (n int, err error) {
@@ -40,9 +40,9 @@ func (self *stringBuf) Write(p []byte) (n int, err error) {
  * the target directory layout */
 
 type branch struct {
-	name		string
-	files		[]string // just the file names
-	directories	[]branch
+	name        string
+	files       []string // just the file names
+	directories []branch
 }
 
 func (self *branch) print(prefix string) {
@@ -54,7 +54,6 @@ func (self *branch) print(prefix string) {
 		d.print(prefix)
 	}
 }
-
 
 func (self *branch) create(dirname string, templates map[string]*template.Template) {
 	dirname = fmt.Sprintf("%v%v/", dirname, self.name)
@@ -85,10 +84,9 @@ func (self *branch) create(dirname string, templates map[string]*template.Templa
 	}
 }
 
-
 // this gets called from the outside world
 func (self *command) Exec(args []string) int {
-	switch (len(args)) {
+	switch len(args) {
 	case 0:
 		return self.Help()
 		break
@@ -114,7 +112,7 @@ func (self *command) createNewProject() int {
 		// read fileContents from the zipped file
 		fileContents := readZippedFile(zippedFile)
 
-		// if it's the layout.json, parse that 
+		// if it's the layout.json, parse that
 		if zippedFile.Name == "layout.json" {
 			common.Log("parsing layout.json")
 			self.directoryTree = jsonToBranch(readJson(fileContents))
@@ -186,7 +184,6 @@ func jsonToBranch(name string, tree map[string]interface{}) branch {
 	}
 	return result
 }
-
 
 func (self *command) Help() int {
 	common.Out("create <template> <name>")

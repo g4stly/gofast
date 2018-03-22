@@ -1,11 +1,10 @@
 package main
 
 import (
-	"os"
-	"github.com/g4stly/gofast/common"
 	"github.com/g4stly/gofast/commands"
+	"github.com/g4stly/gofast/common"
+	"os"
 )
-
 
 func main() {
 	if len(common.Args) < 1 {
