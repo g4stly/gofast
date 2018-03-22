@@ -39,6 +39,10 @@ func Out(fmtstring string, args ...interface{}) {
 	msg(os.Stdout, "info", fmtstring, args...)
 }
 
+func Usage(fmtstring string, args ...interface{}) {
+	msg(os.Stdout, "usage", fmtstring, args...)
+}
+
 func Fatal(fmtstring string, args ...interface{}) {
 	msg(os.Stderr, "FATAL", fmtstring, args...)
 	os.Exit(1)
