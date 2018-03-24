@@ -24,8 +24,7 @@ func init() {
 		Fatal("init(): %v", err)
 	}
 
-	configFileName := fmt.Sprintf("%v/config.json", DotFileName)
-	Config, err = config.LoadFile(configFileName)
+	Config, err = config.LoadFile(*configLocation)
 	if err != nil {
 		Fatal("init(): %v", err)
 	}
@@ -35,12 +34,14 @@ type Command interface {
 	Help() int
 	Exec([]string) int
 }
+
 // important stuffs
 var Args []string
 var Config map[string]interface{}
+var DotFileName = fmt.Sprintf("/home/%v/.gofast", os.Getenv("USER"))
 var verbose = flag.Bool("v", false, "verbose: print debug output")
 var silent = flag.Bool("s", false, "silent: surpress all output")
-var DotFileName = fmt.Sprintf("/home/%v/.gofast", os.Getenv("USER"))
+var configLocation = flag.String("c", fmt.Sprintf("%v/config.json", DotFileName), "config: path to configuration")
 
 /*
 	logging stuffs
