@@ -1,5 +1,9 @@
 package create
 
+/* 
+	here be hacks
+*/
+
 import (
 	"archive/zip"
 	"encoding/json"
@@ -18,8 +22,11 @@ import (
 type command struct {
 	directoryTree     branch
 	templates         map[string]*template.Template
-	targetName        string
 	targetProjectType string
+	// below are fields exported to each file template
+	Name		string
+	Namespace	string
+	DefaultPort	int
 }
 
 // this type shouldn't even exist
@@ -55,7 +62,7 @@ func (self *branch) print(prefix string) {
 	}
 }
 
-func (self *branch) create(dirname string, templates map[string]*template.Template) {
+func (self *branch) create(dirname string, project *command) {
 	dirname = fmt.Sprintf("%v%v/", dirname, self.name)
 	common.Log("creating directory `%v`", dirname)
 	os.Mkdir(dirname, 0755)
@@ -73,26 +80,41 @@ func (self *branch) create(dirname string, templates map[string]*template.Templa
 
 		// pick our template using our non-absolute filename
 		// execute the template into the file we opened
-		err = templates[filename].Execute(file, self)
+		tmpl, ok := project.templates[filename]
+		if !ok {
+			common.Fatal("create: template %v does not exist!", filename)
+		}
+		err = tmpl.Execute(file, project)
 		if err != nil {
 			common.Fatal("create: template.Execute(): %v", err)
 		}
 	}
 	// recursion is fucking sexy btw
 	for _, dir := range self.directories {
-		dir.create(dirname, templates)
+		dir.create(dirname, project)
 	}
 }
 
 // this gets called from the outside world
+// set up all our options/stuff here
 func (self *command) Exec(args []string) int {
 	switch len(args) {
 	case 0:
 		return self.Help()
 		break
 	case 1:
+		self.Name = args[0]
 		self.targetProjectType = "generic"
-		self.targetName = args[0]
+		// attempt to use fields from the config file
+		var ok bool
+		self.Namespace, ok = common.Config["defaultNamespace"].(string)
+		if !ok {
+			self.Namespace = fmt.Sprintf("github.com/%v/%v", os.Getenv("USER"), self.Name)
+		}
+		self.DefaultPort, ok = common.Config["defaultPort"].(int)
+		if !ok {
+			self.DefaultPort = 8080
+		}
 		return self.createNewProject()
 		break
 	}
@@ -101,7 +123,7 @@ func (self *command) Exec(args []string) int {
 }
 
 func (self *command) createNewProject() int {
-	common.Log("creating new %v project with name %v", self.targetProjectType, self.targetName)
+	common.Log("creating new %v project with name %v", self.targetProjectType, self.Name)
 
 	// parse the template package
 	zipReader := getZipReader(self.targetProjectType)
@@ -115,7 +137,7 @@ func (self *command) createNewProject() int {
 		// if it's the layout.json, parse that
 		if zippedFile.Name == "layout.json" {
 			common.Log("parsing layout.json")
-			self.directoryTree = jsonToBranch(readJson(fileContents))
+			self.directoryTree = jsonToBranch(self.Name, readJson(fileContents.asBytes, int64(zippedFile.UncompressedSize64)))
 			continue
 		}
 
@@ -123,7 +145,7 @@ func (self *command) createNewProject() int {
 		common.Log("creating template with name `%v`", zippedFile.Name)
 
 		tempTemplate := template.New(zippedFile.Name)
-		self.templates[zippedFile.Name] = template.Must(tempTemplate.Parse(fileContests.asString))
+		self.templates[zippedFile.Name] = template.Must(tempTemplate.Parse(fileContents.asString))
 	}
 
 	// if we didn't find a layout.json, banic!
@@ -132,20 +154,22 @@ func (self *command) createNewProject() int {
 	}
 
 	// create the junk
-	self.directoryTree.create("", self.templates)
+	self.directoryTree.create("", self)
 
 	return 0
 }
 
+// database stuff in here?
 func getZipReader(templateName string) *zip.ReadCloser {
-	reader, err := zip.OpenReader(fmt.Sprintf("templates/%v.zip", templateName))
+	templateLocation := fmt.Sprintf("%v/templates/%v.zip", common.DotFileName, templateName)
+	reader, err := zip.OpenReader(templateLocation)
 	if err != nil {
-		common.Fatal("create: getZipReader(): %v", err)
+		common.Fatal("create: failed to fetch template `%v` from %v", templateName, templateLocation)
 	}
 	return reader
 }
 
-func readZippedFile(zippedFile *zip.ReadCloser) *stringBuf {
+func readZippedFile(zippedFile *zip.File) *stringBuf {
 	file, err := zippedFile.Open()
 	if err != nil {
 		common.Fatal("create: readZippedFile(): %v", err)
@@ -166,7 +190,7 @@ func readZippedFile(zippedFile *zip.ReadCloser) *stringBuf {
 
 func readJson(jsonData []byte, size int64) map[string]interface{} {
 	var jsonObject interface{}
-	err = json.Unmarshal(jsonData, &jsonObject)
+	err := json.Unmarshal(jsonData, &jsonObject)
 	if err != nil {
 		common.Fatal("create: json.Unmarshal(): %v", err)
 	}
